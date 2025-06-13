@@ -1,4 +1,3 @@
-// This file is machine-generated - edit at your own risk!
 
 'use server';
 
@@ -31,8 +30,6 @@ export type ExtractProductsFromUrlOutput = z.infer<
   typeof ExtractProductsFromUrlOutputSchema
 >;
 
-import {Browser, chromium} from 'playwright';
-
 export async function extractProductsFromUrl(
   input: ExtractProductsFromUrlInput
 ): Promise<ExtractProductsFromUrlOutput> {
@@ -46,9 +43,10 @@ const extractProductsFromUrlFlow = ai.defineFlow(
     outputSchema: ExtractProductsFromUrlOutputSchema,
   },
   async input => {
-    let browser: Browser | null = null;
+    let browser: import('playwright').Browser | null = null;
     try {
-      browser = await chromium.launch();
+      const { chromium } = await import('playwright');
+      browser = await chromium.launch({ headless: true });
       const page = await browser.newPage();
       await page.goto(input.url);
 
@@ -58,11 +56,10 @@ const extractProductsFromUrlFlow = ai.defineFlow(
 
         for (let i = 0; i < productElements.length; i++) {
           const element = productElements[i];
-          // Basic heuristics to identify product-like elements
           if (
             element.tagName === 'A' &&
-            element.href &&
-            element.querySelector('*[src]') // has an image
+            (element as HTMLAnchorElement).href &&
+            element.querySelector('*[src]')
           ) {
             const nameElement = element.querySelector('h1, h2, h3, div');
             const priceElement = element.querySelector('span, div');
@@ -74,19 +71,18 @@ const extractProductsFromUrlFlow = ai.defineFlow(
               products.push({
                 name: name,
                 price: price,
-                link: element.href,
+                link: (element as HTMLAnchorElement).href,
               });
             }
           }
         }
-
         return products;
       });
 
       return products;
-    } catch (error) {
-      console.error('Error during scraping:', error);
-      return []; // Return an empty array in case of an error
+    } catch (error: any) {
+      console.error('Error during scraping:', error.message ? error.message : error);
+      return []; 
     } finally {
       if (browser) {
         await browser.close();
@@ -94,3 +90,4 @@ const extractProductsFromUrlFlow = ai.defineFlow(
     }
   }
 );
+
