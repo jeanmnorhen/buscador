@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition } from 'react';
@@ -14,12 +15,13 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { fetchProductsAndSummary } from './actions';
 import type { ExtractProductsFromUrlOutput } from '@/ai/flows/extract-products-from-url';
 import type { ProductSearchSummaryOutput } from '@/ai/flows/product-search-summary';
-import { AlertCircle, Info, PackageSearch, SearchIcon } from 'lucide-react';
+import { AlertCircle, Info, PackageSearch, SearchIcon, ListFilter } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const formSchema = z.object({
   url: z.string().url({ message: 'Please enter a valid URL (e.g., https://example.com)' }),
+  searchTerm: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -34,6 +36,7 @@ export default function HomePage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       url: '',
+      searchTerm: '',
     },
   });
 
@@ -42,7 +45,7 @@ export default function HomePage() {
     setSummary(null);
 
     startTransition(async () => {
-      const result = await fetchProductsAndSummary(data.url);
+      const result = await fetchProductsAndSummary(data.url, data.searchTerm);
       if (result.error) {
         toast({
           variant: "destructive",
@@ -76,7 +79,7 @@ export default function HomePage() {
                 <CardTitle className="text-2xl font-headline text-primary">Search Products by URL</CardTitle>
               </div>
               <CardDescription className="text-foreground/80 pt-1">
-                Enter a website URL below, and our AI will try to find products listed on that page.
+                Enter a website URL and optionally a search term to find specific products.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6">
@@ -98,6 +101,28 @@ export default function HomePage() {
                           />
                         </FormControl>
                         <FormMessage id="url-form-message" />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="searchTerm"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-lg font-medium">Search Term (Optional)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                            <Input
+                              type="text"
+                              placeholder="e.g., running shoes, coffee maker"
+                              {...field}
+                              className="text-base py-3 px-4 h-12 rounded-lg focus:ring-2 focus:ring-primary/50 pl-10"
+                              aria-describedby="searchterm-form-message"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage id="searchterm-form-message" />
                       </FormItem>
                     )}
                   />

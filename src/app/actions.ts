@@ -1,3 +1,4 @@
+
 'use server';
 
 import { extractProductsFromUrl, type ExtractProductsFromUrlOutput } from '@/ai/flows/extract-products-from-url';
@@ -5,6 +6,7 @@ import { productSearchSummary, type ProductSearchSummaryOutput } from '@/ai/flow
 import { z } from 'zod';
 
 const UrlSchema = z.string().url({ message: "Please enter a valid URL." });
+const SearchTermSchema = z.string().optional();
 
 interface ActionResult {
   products: ExtractProductsFromUrlOutput | null;
@@ -12,9 +14,10 @@ interface ActionResult {
   error: string | null;
 }
 
-export async function fetchProductsAndSummary(url: string): Promise<ActionResult> {
+export async function fetchProductsAndSummary(url: string, searchTerm?: string): Promise<ActionResult> {
   try {
     const validatedUrl = UrlSchema.parse(url);
+    const validatedSearchTerm = SearchTermSchema.parse(searchTerm);
     
     const products = await extractProductsFromUrl({ url: validatedUrl });
 
@@ -26,15 +29,18 @@ export async function fetchProductsAndSummary(url: string): Promise<ActionResult
       };
     }
     
-    // Prepare product details for summary
-    // The AI flow for summary might work better with a textual representation or specific fields.
-    // For now, stringifying the whole product list. Consider a more structured input if results are poor.
-    const productDetailsString = products.map(p => `Name: ${p.name}, Price: ${p.price}, Link: ${p.link}`).join('\n');
+    const productDetailsString = products.map(p => `Name: ${p.name}, Price: ${p.price}, Link: ${p.link}`).join('\\n');
 
-    const summary = await productSearchSummary({
+    const summaryInput: { url: string; productDetails: string; searchTerm?: string } = {
       url: validatedUrl,
       productDetails: productDetailsString,
-    });
+    };
+
+    if (validatedSearchTerm) {
+      summaryInput.searchTerm = validatedSearchTerm;
+    }
+
+    const summary = await productSearchSummary(summaryInput);
 
     return { products, summary, error: null };
 

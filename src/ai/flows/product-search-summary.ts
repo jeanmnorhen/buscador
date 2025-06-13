@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -14,11 +15,12 @@ import {z} from 'genkit';
 const ProductSearchSummaryInputSchema = z.object({
   url: z.string().describe('The URL to scrape for product information.'),
   productDetails: z.string().describe('The detailed information about products extracted from the URL.'),
+  searchTerm: z.string().optional().describe('An optional search term to focus the summary on specific products.'),
 });
 export type ProductSearchSummaryInput = z.infer<typeof ProductSearchSummaryInputSchema>;
 
 const ProductSearchSummaryOutputSchema = z.object({
-  summary: z.string().describe('A concise summary of the types of products found and their price ranges.'),
+  summary: z.string().describe('A concise summary of the types of products found and their price ranges, potentially focused by a search term.'),
 });
 export type ProductSearchSummaryOutput = z.infer<typeof ProductSearchSummaryOutputSchema>;
 
@@ -32,10 +34,13 @@ const prompt = ai.definePrompt({
   output: {schema: ProductSearchSummaryOutputSchema},
   prompt: `You are an AI assistant designed to provide concise summaries of product offerings from a given website.
 
-  Based on the product details extracted from the URL, create a summary that includes the types of products found and their general price ranges.
-  URL: {{{url}}}
-  Product Details: {{{productDetails}}}
-  Summary:`, // Removed 'generate' to avoid confusion, added colon
+Based on the product details extracted from the URL, create a summary that includes the types of products found and their general price ranges.
+{{#if searchTerm}}
+Focus your summary on products related to the term: "{{{searchTerm}}}".
+{{/if}}
+URL: {{{url}}}
+Product Details: {{{productDetails}}}
+Summary:`,
 });
 
 const productSearchSummaryFlow = ai.defineFlow(
