@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +16,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { fetchProductsAndSummary } from './actions';
 import type { ExtractProductsFromUrlOutput } from '@/ai/flows/extract-products-from-url';
 import type { ProductSearchSummaryOutput } from '@/ai/flows/product-search-summary';
-import { AlertCircle, Info, PackageSearch, SearchIcon, ListFilter } from 'lucide-react';
+import { AlertCircle, Info, PackageSearch, SearchIcon, ListFilter, ArrowRight } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -29,6 +30,7 @@ type FormValues = z.infer<typeof formSchema>;
 export default function HomePage() {
   const [products, setProducts] = useState<ExtractProductsFromUrlOutput | null>(null);
   const [summary, setSummary] = useState<ProductSearchSummaryOutput | null>(null);
+  const [currentSearchedUrl, setCurrentSearchedUrl] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
@@ -43,6 +45,7 @@ export default function HomePage() {
   const onSubmit: SubmitHandler<FormValues> = (data) => {
     setProducts(null);
     setSummary(null);
+    setCurrentSearchedUrl(data.url);
 
     startTransition(async () => {
       const result = await fetchProductsAndSummary(data.url, data.searchTerm);
@@ -54,6 +57,7 @@ export default function HomePage() {
         });
         setProducts(null);
         setSummary(null);
+        setCurrentSearchedUrl(null);
       } else {
         setProducts(result.products);
         setSummary(result.summary);
@@ -171,9 +175,19 @@ export default function HomePage() {
 
         {!isPending && products && products.length > 0 && (
           <section className="animate-fade-in animation-delay-400">
-            <h2 className="text-3xl font-headline font-semibold mb-8 text-center text-foreground">
-              Found Products ({products.length})
-            </h2>
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-3xl font-headline font-semibold text-foreground">
+                Found Products ({products.length})
+              </h2>
+              {currentSearchedUrl && (
+                <Button asChild variant="outline" size="lg">
+                  <Link href={`/approval?url=${encodeURIComponent(currentSearchedUrl)}`}>
+                    Review & Approve Products
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Link>
+                </Button>
+              )}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
               {products.map((product, index) => (
                 <div key={product.link + index} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
