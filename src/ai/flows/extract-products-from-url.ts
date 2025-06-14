@@ -48,35 +48,94 @@ const extractProductsFromUrlFlow = ai.defineFlow(
       const { chromium } = await import('playwright');
       browser = await chromium.launch({ headless: true });
       const page = await browser.newPage();
-      await page.goto(input.url);
+      await page.goto(input.url, { waitUntil: 'networkidle' });
 
       const products = await page.evaluate(() => {
-        const productElements = document.querySelectorAll('*');
-        const products = [];
+        const productElements = document.querySelectorAll('a[href]');
+        const extractedProducts = [];
 
         for (let i = 0; i < productElements.length; i++) {
-          const element = productElements[i];
-          if (
-            element.tagName === 'A' &&
-            (element as HTMLAnchorElement).href &&
-            element.querySelector('*[src]')
-          ) {
-            const nameElement = element.querySelector('h1, h2, h3, div');
-            const priceElement = element.querySelector('span, div');
+          const linkElement = productElements[i] as HTMLAnchorElement;
 
-            const name = nameElement ? nameElement.textContent?.trim() : '';
-            const price = priceElement ? priceElement.textContent?.trim() : '';
+          if (linkElement.querySelector('img')) { // Check if the link contains an image
+            const productLink = linkElement.href;
+            
+            let name = '';
+            let price = '';
 
-            if (name && price) {
-              products.push({
-                name: name,
-                price: price,
-                link: (element as HTMLAnchorElement).href,
-              });
+            // Define scopes to search for name and price: current link, parent, grandparent
+            const scopesToTry: HTMLElement[] = [];
+            if (linkElement.parentElement) {
+              scopesToTry.push(linkElement.parentElement);
+              if (linkElement.parentElement.parentElement) {
+                scopesToTry.push(linkElement.parentElement.parentElement);
+              }
+            }
+            scopesToTry.push(linkElement); // Check inside the link element itself last
+
+            for (const scope of scopesToTry) {
+              if (!name) {
+                const nameEl = scope.querySelector('h1, h2, h3, h4, h5, h6, [itemprop="name"], [class*="title"], [class*="name"], [class*="Title"], [class*="Name"]');
+                if (nameEl) name = nameEl.textContent?.trim() || '';
+                else {
+                  // Broader search if specific name selectors fail within this scope
+                  const generalNameSelectors = ['p', 'div', 'span'];
+                  for (const selector of generalNameSelectors) {
+                    const generalNameEl = scope.querySelector(selector);
+                    if (generalNameEl && generalNameEl.textContent?.trim().length > 3 && generalNameEl.textContent?.trim().length < 150) { // Basic heuristic for name-like text
+                       name = generalNameEl.textContent.trim();
+                       if (name) break;
+                    }
+                  }
+                }
+              }
+
+              if (!price) {
+                const priceEl = scope.querySelector('[itemprop="price"], [class*="price"], [class*="Price"]');
+                if (priceEl) price = priceEl.textContent?.trim() || '';
+                else {
+                    // Broader search for price-like text, ensuring it has digits
+                    const generalPriceSelectors = ['span', 'div', 'p'];
+                     for (const selector of generalPriceSelectors) {
+                        const generalPriceEl = scope.querySelector(selector);
+                        if (generalPriceEl && generalPriceEl.textContent?.trim() && /\d/.test(generalPriceEl.textContent)) {
+                             price = generalPriceEl.textContent.trim();
+                             if (price) break;
+                        }
+                    }
+                }
+              }
+              if (name && price) break; 
+            }
+            
+            if (!name) {
+              const imgElement = linkElement.querySelector('img');
+              if (imgElement && imgElement.alt) {
+                name = imgElement.alt.trim();
+              }
+            }
+
+            if (name && price && productLink) {
+              if (/\d/.test(price)) { // Ensure price string contains at least one digit
+                extractedProducts.push({
+                  name: name,
+                  price: price,
+                  link: productLink,
+                });
+              }
             }
           }
         }
-        return products;
+        // Deduplicate products based on link
+        const uniqueProducts = [];
+        const seenLinks = new Set();
+        for (const prod of extractedProducts) {
+            if (!seenLinks.has(prod.link)) {
+                seenLinks.add(prod.link);
+                uniqueProducts.push(prod);
+            }
+        }
+        return uniqueProducts;
       });
 
       return products;
@@ -90,4 +149,3 @@ const extractProductsFromUrlFlow = ai.defineFlow(
     }
   }
 );
-
